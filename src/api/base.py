@@ -64,6 +64,7 @@ async def search_files(
         user: User = Depends(current_user),
         path: str = None,
         extension: str = None,
+        file_name: str = None,
         limit: int = 100,
 ) -> list[File]:
     result = await files_crud.search_files(
@@ -71,6 +72,7 @@ async def search_files(
         user=user,
         path=path,
         extension=extension,
+        file_name=file_name,
         limit=limit,
     )
     return result

@@ -194,8 +194,9 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             user: User,
             path: str,
             extension: str,
+            file_name: str,
             limit: int
-    ):
+    ):  # Как сделать это короче, не придумал))
         if path and extension:
             statement = (
                 select(self._model)
@@ -204,5 +205,40 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
                 .where(self._model.name.endswith(f'.{extension}'))
                 .limit(limit)
             )
-            file_list = await db.scalars(statement=statement)
-            return file_list.all()
+        elif path and file_name:
+            statement = (
+                select(self._model)
+                .where(self._model.author == user.id)
+                .where(self._model.path == path)
+                .where(self._model.name.startswith(f'{file_name}'))
+                .limit(limit)
+            )
+        elif file_name:
+            statement = (
+                select(self._model)
+                .where(self._model.author == user.id)
+                .where(self._model.name.startswith(f'{file_name}'))
+                .limit(limit)
+            )
+        elif extension:
+            statement = (
+                select(self._model)
+                .where(self._model.author == user.id)
+                .where(self._model.name.endswith(f'.{extension}'))
+                .limit(limit)
+            )
+        elif extension and file_name:
+            statement = (
+                select(self._model)
+                .where(self._model.author == user.id)
+                .where(self._model.path == path)
+                .where(self._model.name.startswith(f'{file_name}'))
+                .where(self._model.name.endswith(f'{extension}'))
+                .limit(limit)
+            )
+        else:
+            return {'Error': 'What are you looking for??'}
+        file_list = await db.scalars(statement=statement)
+        return file_list.all()
+
+

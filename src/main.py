@@ -20,18 +20,18 @@ app.include_router(
 )
 app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
-    prefix="/auth",
-    tags=["Auth"],
+    prefix='/auth',
+    tags=['Auth'],
 )
 app.include_router(
     fastapi_users.get_auth_router(jwt_backend),
-    prefix="/auth/jwt",
-    tags=["Auth"],
+    prefix='/auth/jwt',
+    tags=['Auth'],
 )
 app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
+    prefix='/users',
+    tags=['users'],
 )
 if __name__ == '__main__':
-    uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
+    uvicorn.run(app, host='0.0.0.0', port=8080, log_level='info')
