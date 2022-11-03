@@ -1,4 +1,3 @@
-import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import BytesIO
@@ -6,6 +5,7 @@ from pathlib import Path
 from typing import Generic, Type, TypeVar, Union
 from zipfile import ZipFile
 
+import aiofiles
 from fastapi import File, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
@@ -28,7 +28,7 @@ class Repository(ABC):
 
     @abstractmethod
     def create(self, *args, **kwargs):
-        raise NotImplementedError
+        pass
 
 
 class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
@@ -47,7 +47,7 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             )
         )
         result: ScalarResult = await db.scalars(statement=statement)
-        logger.info(result)
+        logger.debug(result)
         return result.all()
 
     async def get_path_by_id(self, db, user, id):
@@ -111,7 +111,7 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             path: str,
     ):
         full_path = f'{user.username}/{path}'
-        file_list = [f'{full_path}/{file}' for file in os.listdir(full_path)]
+        file_list = [f'{full_path}/{file}' for file in list(Path(full_path).iterdir())]
         archive = self.zip_folder(file_list)
         return archive
 
@@ -123,8 +123,6 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             path: str,
             file: UploadFile = File(),
     ):
-        logger.info(file)
-        logger.info(await file.read())
         db_obj = self._model(
             name=file.filename,
             path=path,
@@ -151,11 +149,11 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             p = Path(user_path)
         try:
             if not Path.exists(p):
-                os.makedirs(p)
+                Path(p).mkdir(parents=True, exist_ok=True)
                 logger.info(f'mkdir {user_path}')
-            with open(os.path.join(f'{p}/{file.filename}'), 'wb') as f:
+            async with aiofiles.open(Path(p, file.filename), 'wb') as f:
                 logger.info(f)
-                f.write(content)
+                await f.write(content)
         except Exception as ex:
             return ex
 
@@ -166,7 +164,7 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             path: str,
             file: UploadFile = File(),
     ):
-        file_size = len(file.file.read())
+        file_size = len(await file.read())
         result = await self.write_file(
             user=user,
             path=path,
@@ -196,49 +194,37 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType]):
             extension: str,
             file_name: str,
             limit: int
-    ):  # Как сделать это короче, не придумал))
+    ):
+        statement = (
+            select(self._model)
+            .where(self._model.author == user.id)
+        )
         if path and extension:
             statement = (
-                select(self._model)
-                .where(self._model.author == user.id)
-                .where(self._model.path == path)
+                statement.where(self._model.path == path)
                 .where(self._model.name.endswith(f'.{extension}'))
-                .limit(limit)
             )
         elif path and file_name:
             statement = (
-                select(self._model)
-                .where(self._model.author == user.id)
-                .where(self._model.path == path)
+                statement.where(self._model.path == path)
                 .where(self._model.name.startswith(f'{file_name}'))
-                .limit(limit)
             )
         elif file_name:
             statement = (
-                select(self._model)
-                .where(self._model.author == user.id)
-                .where(self._model.name.startswith(f'{file_name}'))
-                .limit(limit)
+                statement.where(self._model.name.startswith(f'{file_name}'))
             )
         elif extension:
             statement = (
-                select(self._model)
-                .where(self._model.author == user.id)
-                .where(self._model.name.endswith(f'.{extension}'))
-                .limit(limit)
+                statement.where(self._model.name.endswith(f'.{extension}'))
             )
         elif extension and file_name:
             statement = (
-                select(self._model)
-                .where(self._model.author == user.id)
-                .where(self._model.path == path)
+                statement.where(self._model.path == path)
                 .where(self._model.name.startswith(f'{file_name}'))
                 .where(self._model.name.endswith(f'{extension}'))
-                .limit(limit)
             )
         else:
             return {'Error': 'What are you looking for??'}
+        statement = statement.limit(limit)
         file_list = await db.scalars(statement=statement)
         return file_list.all()
-
-

@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
+from fastapi_pagination import add_pagination
 
 from api import base
 from core.config import app_settings
@@ -35,3 +36,5 @@ app.include_router(
 )
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8080, log_level='info')
+
+add_pagination(app)

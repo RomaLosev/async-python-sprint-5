@@ -1,34 +1,42 @@
+import time
+
 from fastapi import APIRouter, Depends, File, UploadFile
-from loguru import logger
+from fastapi_pagination import Page, paginate
+from fastapi_pagination.ext.sqlalchemy import AbstractPage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.db import get_session
 from models.models import User
+from schemas.files import FileInDB
 from services.files import files_crud
 from users.manager import current_user
 
 router = APIRouter()
 
 
+# Не нашёл как достать время отклика базы данных, будем замерять запрос))
+# Буду признателен за подсказку, как можно было сделать правильно)
 @router.get('/ping')
 async def get_ping(
         db: AsyncSession = Depends(get_session),
         user: User = Depends(current_user),
 ) -> any:
-    logger.info(f'Current user {user.username}')
+    start_time = time.time()
+    await files_crud.get(db=db, user=user)
+    ping = time.time() - start_time
     return {
-        'db_is_active': db.is_active,
-        'username': user.username
+        'ping': "{:.4f}".format(ping),
+        'user': {'username': user.username, 'email': user.email},
     }
 
 
-@router.get('/list')
+@router.get('/list', response_model=Page[FileInDB])
 async def get_files_list(
         db: AsyncSession = Depends(get_session),
         user: User = Depends(current_user),
-) -> list[File]:
+) -> AbstractPage:
     files = await files_crud.get(db=db, user=user)
-    return files
+    return paginate(files)
 
 
 @router.post('/upload')
